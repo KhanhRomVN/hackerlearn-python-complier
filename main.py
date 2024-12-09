@@ -4,15 +4,13 @@ from typing import Optional
 import subprocess
 import tempfile
 import os
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
 # Khởi tạo FastAPI và rate limiter
 app = FastAPI(title="Python Code Compiler API")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 class CodeRequest(BaseModel):
     code: str
@@ -20,7 +18,7 @@ class CodeRequest(BaseModel):
 
 @app.post("/compile")
 @limiter.limit("20/minute")
-async def compile_code(request: CodeRequest):
+async def compile_code(request: CodeRequest, req: Request):
     try:
         # Tạo file tạm thời để lưu code
         with tempfile.NamedTemporaryFile(suffix='.py', mode='w', delete=False) as temp_file:
@@ -39,7 +37,7 @@ async def compile_code(request: CodeRequest):
                 )
                 stdout, stderr = process.communicate(
                     input=request.user_input, 
-                    timeout=5  # Timeout 5 giây
+                    timeout=5
                 )
             else:
                 # Chạy code không cần input
@@ -47,21 +45,21 @@ async def compile_code(request: CodeRequest):
                     ['python3.9', temp_file_path],
                     capture_output=True,
                     text=True,
-                    timeout=5  # Timeout 5 giây
+                    timeout=5
                 )
                 stdout = result.stdout
                 stderr = result.stderr
 
             return {
-                "status": "success",
-                "output": stdout,
-                "error": stderr
+                'status': 'success',
+                'output': stdout,
+                'error': stderr
             }
 
         except subprocess.TimeoutExpired:
             raise HTTPException(
                 status_code=408, 
-                detail="Code execution timed out (limit: 5 seconds)"
+                detail='Code execution timed out (limit: 5 seconds)'
             )
         finally:
             # Luôn xóa file tạm sau khi chạy xong
@@ -73,13 +71,13 @@ async def compile_code(request: CodeRequest):
 @app.get("/")
 async def read_root():
     return {
-        "message": "Welcome to Python Code Compiler API",
-        "endpoints": {
-            "/compile": "POST - Compile and run Python code",
+        'message': 'Welcome to Python Code Compiler API',
+        'endpoints': {
+            '/compile': 'POST - Compile and run Python code',
         },
-        "limits": {
-            "requests": "5 per minute per IP",
-            "execution_time": "5 seconds",
+        'limits': {
+            'requests': '5 per minute per IP',
+            'execution_time': '5 seconds',
         }
     }
 
